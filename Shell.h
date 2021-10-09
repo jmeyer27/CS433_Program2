@@ -6,13 +6,15 @@
 // ============================================
 #pragma once
 #include <vector>
+using namespace std;
 
-const int MAXLINE = 80;									// max length command
+const int MAX = 50;									// max length command
+
 
 // Implementation of shell
 class Shell {
 public:
-	bool running;										// if program should run
+	bool isRunning;										// if program should run
 	void parseline(char buffer[], char * args[]);		// parses the command into arguments.
 	void execShellCommand(char * args[]);				// executes shell command.
 	void execUserCommand(char * arg[]);					// executes user command.
@@ -21,7 +23,7 @@ public:
 	Shell();											// default constructor.
 
 private:
-	std::vector<std::string> history;					// command history list.
+	 vector<string> history;					// command history list.
 	bool ampersand;										// if command contains ampersand.
 	void displayHistory();								// displays command history list.
-}
+};
