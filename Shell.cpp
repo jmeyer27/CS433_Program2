@@ -1,49 +1,41 @@
+//=========================================================
+//CS 433 Assignment 2
+//Your names: Jasmine Meyer and Birhane Diarra
+//File type: Shell Class File
+//Purpose: Creates Shell, reads input commands and executes child processes to run commands. Includes history feature.
+//===========================================================
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <sys/wait.h>
 #include <unistd.h>
 #include "Shell.h"
-#include <sys/types.h>//unknown if these are needed
-#include <stdio.h>//unknown if these are needed
-#include <string.h>//unknown if these are needed
-
 using namespace std;
 
 
-
-// Default constructor for Shell program
+// Default constructor for Shell program with two variables. 
 Shell::Shell()
 {
-	isRunning = true;
-	ampersand = false;
+	isRunning = true;//boolean if process is running or not
+	ampersand = false;//boolean to see if parent process needs to wait()
 }
 
 
-// PURPOSE: This function executes a shell command.
-// PARAMETER: args[] = the arguments in the command.
-void Shell::execShellCommand(char * args[])
+// PURPOSE: Executes a shell command. After readin guser input, will fork child using fork(), the child will invoke execvp(), and will check for & (ampersand) to see if it is necessary to wait for child.
+// PARAMETER: char args[] = the arguments in the command.
+void Shell::executeShellCommand(char * args[])
 {
-	/*
-	* After reading user input, the steps are:
-	* (1) fork a child process using fork()
-	* (2) the child process will invoke execvp()
-	* (3) if command not included &, parent will invoke wait()
-	*/
-
 	pid_t pid = fork();			// fork a child process using fork()
 
-	
 	if (pid == 0) { // child process base case
-		execvp(args[0], args);	// step 2
-	
+		execvp(args[0], args);	// Child invokes execvp
 		cout << "execvp: command not found" << endl;//not found
 		exit(1); 	//quits process	
 	}
 
 	// if is a parent process
 	else if (pid > 0) {
-		if (ampersand == false) { //if command not included &, parent will invoke wait()
+		if (ampersand == false) { //if command not included & (ampersand), parent will invoke wait()
 			wait(NULL);			
 		}
 	}
@@ -57,127 +49,123 @@ void Shell::execShellCommand(char * args[])
 
 
 
-// PURPOSE: This function executes a user command.
-// PARAMETER: arg[] = arguments of the command.
-void Shell::execUserCommand(char* arg[])
+// PURPOSE: Executes a user command.
+// PARAMETER: char arg[] = arguments of the command.
+void Shell::executeUserCommand(char* arg[])
 {
 	string command(arg[0]);
 
-	// command to exit out of program
-	if (command == "exit") {
+
+  // if command is history, display history
+	if (command == "history") {
+		displayHistory();
+	}
+	// if command is exit, process is no longer running and terminates in program
+	else if (command == "exit") {
 		isRunning = false;
 	}
 
-	// command to display command history
-	else if (command == "history") {
-		displayHistory();
-	}
 
-	// command used to select a previous command in command history
+	// When command is "!", will have to choose to select a command from the command history
 	else if (command[0] == '!') {
 		char buffer[MAX];
 		char * args[MAX / 2 + 1];
-		int N;	
+		int num;	
 
-		// command is "!!" format, selects the most recent command
+		// When command is "!!", most recent command is run again
 		if (command == "!!") {
 
-			// input error
+			// If the history is empty, tell user
 			if (history.empty()) {
 				cout << "No commands in history." << endl;
 				return;
 			}
 
-			N = history.size();
+			num = history.size();
 		}
 
-		// command is "!N" format, selects the Nth command.
+		// else command is "!N" and selects the Nth command
 		else {
 
-			// seperate ! and N
+			// separates ! and N to be used
 			string temp = command.substr(1, command.length());			
-			N = atoi(temp.c_str());	// converts string to int.
+			num = atoi(temp.c_str());	// num = N
 
-			// last command to show
+			// min = minumum command for history
 			int min = (history.size() < 10) ? 0 : history.size() - 10;
 
-			// input error handling
-			if (N > history.size() || N < min + 1) {
-				cout << "No such command in history." << endl;
+			// if command is not in history, either too big or too small N
+			if (num > history.size() || num < min + 1) {
+				cout << "Command not valid in history." << endl;
 				return;
 			}
 		}
-		// echo selected command to screen.
-		cout << history[N - 1] << endl; 
+		// command selection to be sent to user
+		cout << history[num - 1] << endl; 
 
-		// copy command into a buffer, so it can be parsed and executed
-		strcpy(buffer, history[N - 1].c_str());
-		saveCommand(buffer);
-		parseline(buffer, args);
-		execShellCommand(args);
+		strcpy(buffer, history[num - 1].c_str());//copy command
+		saveCommand(buffer);//save command
+		parseline(buffer, args);//parse command
+		executeShellCommand(args);//execute command
 	}
 }
 
-// PURPOSE: This function checks if the command entered is a user command or execShellCommand command.
-// PARAMETER: arg[] = the arguments in the command.
-// RETURN: true = if user command.
-//	   false = if shell command.
+// PURPOSE: Checks if the command is a user command or execShellCommand command.
+// PARAMETER: char arg[] = the arguments in the command
+// RETURN: true if user command or false if shell command.
 bool Shell::isUserCommand(char * arg[])
 {
-	string command(arg[0]);
+	string command(arg[0]);//starts at beginning
 
-	// command is a user command
+	// If the command is a user command, return true
 	if (command == "exit" || command == "history" || command[0] == '!') {
 		return true;
 	}
 
-	// command is a shell command
+	// Otherwise command is a shell command, and returns false
 	return false;
 }
 
 
-// PURPOSE: This function parses the buffer into arguments.
-// PARAMETERS: buffer[] = the command.
-//		 args[] = the arguments in the command.
+// PURPOSE: The buffer is parsed into arguments
+// PARAMETERS: char buffer[] = the command, char args[] is the arguments in the command.
 void Shell::parseline(char buffer[], char * args[])
 {
-	int i = 0;
+	int i = 0;//start at 0
 
-	// buffer tokenized using loop
-	char * p = strtok(buffer, " ");
-
-	while (p != NULL) {
+	char * p = strtok(buffer, " ");//separate whitespace from buffer
+	while (p != NULL) { //while next char is not NULL, add to args[]
 		args[i] = p;
 		p = strtok(NULL, " ");
 		i++;
 	}
 
-	// if command has ampersand at the end of argument list, remove it and null terminate
+	// if & is at end of argument (args[]), remove it and set ampersand to TRUE
 	if (strcmp(args[i - 1], "&") == 0) {
 		args[i - 1] = NULL;
 		ampersand = true;
 	}
 
 	else {
-		// terminated argument list with null
+		// no ampersand, make end of argument NULL and set ampersand to FALSE
 		args[i] = NULL;
 		ampersand = false;
 	}
 }
 
 
-// PURPOSE: This function saves a command into history.
-// PARAMETER: command[] = the command to save.
+// PURPOSE: Saves commands into history
+// PARAMETER: char command[] is a command to be saved.
 void Shell::saveCommand(char command[])
 {
 	string save(command);
 	history.push_back(save);
 }
 
-// PURPOSE: This function displays the command history list.
+// PURPOSE: To display the history of the commands issued to the Shell
 void Shell::displayHistory()
 {
-	// if the history is empty
+	// if the history is empty, tell user
 	if (history.empty()) {
 		cout << "command history is empty" << endl;
 	}
